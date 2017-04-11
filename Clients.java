@@ -3,6 +3,7 @@ import java.net.*;
 import java.io.*;
 
 //Object describing the client which is stored in server
+/*
 class ClientRequestAndResponseInformation implements Serializable{
 	int port; // Port of the client
 	int getOtherClient; //0 means do not get other client address whereas 1 means to get other client address
@@ -25,65 +26,10 @@ class ClientRequestAndResponseInformation implements Serializable{
 		    }
 	}
 	
-}
-//Class used by client to make request to server 
-class Send{
-	
-	public Send(){
-		
-	}
-	
-	//Method used when the client wants to register itself on the server
-	public synchronized void sendObject(ClientRequestAndResponseInformation clientRequestAndResponseInformation){
-		
-		try{
-			
-			Socket client= new Socket("localhost",4000);
-			OutputStream outToServer = client.getOutputStream();
-	     	ObjectOutputStream out = new ObjectOutputStream(outToServer);
-			clientRequestAndResponseInformation.getOtherClient=0;
-			out.writeObject(clientRequestAndResponseInformation);
-			out.flush();
-			out.close();
-			
-		}catch(Exception e){
-			System.out.println(e+"Problem in sending");
-			
-		}
-		
-	}
-	
-	//Method used when the client wants to get the information about other client to get the file
-	public synchronized int getOtherClientsAddress(ClientRequestAndResponseInformation clientRequestAndResponseInformation,String fileToGet){
-		try{
-			clientRequestAndResponseInformation.getOtherClient=1;
-			Socket client= new Socket("localhost",4000);
-			OutputStream outToServer = client.getOutputStream();
-	     	ObjectOutputStream out = new ObjectOutputStream(outToServer);
-			clientRequestAndResponseInformation.getFile = fileToGet;
-			
-			out.writeObject(clientRequestAndResponseInformation);
-			out.flush();
-			
-			ObjectInputStream in = new ObjectInputStream(client.getInputStream());
-			
-			int otherPort= (int) in.readObject();
-			
-			in.close();
-			return otherPort;
-			
-		}catch(Exception e){
-			System.out.println(e+"Problem is here");
-			return 0;
-		}
-	}
-	
-}
-
-
+}*/
 public class Clients {
+	static int port;
 	static String fileToGet;
-	
 	//Call this method when u want your client to act as server
 	public static void makeServer(int port) {
 		
@@ -179,72 +125,52 @@ public class Clients {
 	}
 	
 	public static void main(String[] args){
-		if(args.length>=1){
-			fileToGet= args[0];
+		//List of other clients
+		List<Integer> otherClients = new ArrayList<Integer>();
+		
+		//Check the inline input
+		if(args.length>=2){
+			port= Integer.valueOf(args[0]);
+		}else{
+			//If error exit
+			System.out.println("Please enter neccessary information about port and configFile");
+			return;
 		}
+		//Check if the file exists and exit if not.
 		try{
-			//Create Multiple Clients
-			for(int i=0;i<1;i++){
-				
-				new Thread(){
-					
-					public void run(){
-						try{
-							//Get random number and assign it as the port number of the client
-							Random rm= new Random();
-							
-							int port = rm.nextInt(200) + 1;
-							if(port < 1000){
-								port+=4000;
-							}
-							
-							/*
-							//Create an object to send and initialize the object to facilitate that transport 
-							ClientRequestAndResponseInformation clientRequestAndResponseInformation = new ClientRequestAndResponseInformation(port);
-							
-							Send send= new Send();
-							
-							//Description on the method
-							send.sendObject(clientRequestAndResponseInformation);
-							*/
-							//Initialize the port as final so as to pass in the thread so as to make it run on different thread.
-							final int finalPort = port;
-							
-							
-							
-							new Thread(){
-								public void run(){
-									makeServer(finalPort);
-									
-								}
-							}.start();
-							Scanner reader = new Scanner(System.in);  // Reading from System.in
-							System.out.println("Enter a number: ");
-							int n = reader.nextInt();
-							System.out.println(n);
-							
-							/* 
-							//Sleep so that all the client get registered on the index server
-							sleep(1000);
-							System.out.println("After Making Server");
-							//Get the port of other client.
-							int serverPort = send.getOtherClientsAddress(clientRequestAndResponseInformation,fileToGet);
-							System.out.println("Got from Server" + serverPort);
-							if(serverPort == 0 || serverPort == 4000 ){
-								System.out.println("No client Available");
-							}else{
-								connectToClient(serverPort);
-							}*/
-							
-						}catch(Exception e){
-							System.out.println(e); //catch any error in the above process
-							
-						}
-					}
-				}.start();
+			Scanner scanner = new Scanner(new File(args[1]));
+			while(scanner.hasNextInt()){
+				otherClients.add(scanner.nextInt());
 			}
 		}catch(Exception e){
-			System.out.println(e);
+			//If error exit
+			System.out.println("Please enter the valid configFile");
+			return;
 		}
+		//Print the  nearby clients
+		for(int c:otherClients){
+			System.out.println(c);
+		}
+		
+		new Thread(){
+			public void run(){
+				makeServer(port);
+				
+			}
+		}.start();
+		String query;
+		
+		//Get the user query
+		while(true){
+			Scanner reader = new Scanner(System.in);  // Reading from System.in
+			System.out.println("Enter the query: ");
+			query = reader.nextLine();
+			
+			if(query.equals("exit")){
+				break;
+			}
+		}
+		System.exit(0);
+		
 	}
 }
