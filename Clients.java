@@ -11,7 +11,7 @@ class ClientRequestAndResponseInformation implements Serializable{
 	int tTl;
 	String fileName;
 	int sourcePort;
-	
+	int destPort;
 	
 	public void setQuery(int serverId, int tTl,String fileName,String messageId){
 		this.searchQuery=true;
@@ -21,9 +21,7 @@ class ClientRequestAndResponseInformation implements Serializable{
 		this.sourcePort= serverId;
 		this.fileName=fileName;
 	}
-	public void setHitQuery(){
-		
-	}
+	
 	
 }
 
@@ -32,7 +30,9 @@ public class Clients {
 	static int port;
 	static String fileToGet;
 	static List<Integer> otherClients;
-	static Map<String,ClientRequestAndResponseInformation> map; 
+	static Map<String,ClientRequestAndResponseInformation> map;
+	static String query;
+	static int ttl=3; 
 	//Call this method when u want your client to act as server
 	public static void makeServer(int port) {
 		
@@ -52,21 +52,43 @@ public class Clients {
 							ObjectInputStream in = new ObjectInputStream(threadClient.getInputStream());
 							//Get the file to send to the other client
 							ClientRequestAndResponseInformation clientRequestAndResponseInformation= (ClientRequestAndResponseInformation) in.readObject();
-							//Print the file name of the file requested
+							
+							//Seeing this request for first time
 							if(map.get(clientRequestAndResponseInformation.messageId)!=null){
 								
 								if(clientRequestAndResponseInformation.searchQuery && clientRequestAndResponseInformation.tTl>0){
-								clientRequestAndResponseInformation.tTl--;
+									clientRequestAndResponseInformation.tTl--;
 								
-								map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
-								
-									for(int otherClientPort:otherClients){
-										connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
-									}
+									map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
+									/*
+									new Thread(){
+										public void run(){
+											for(int otherClientPort:otherClients){
+												connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+											}
+										}
+									}.start();*/
+									
 								}
+								System.out.println(clientRequestAndResponseInformation.fileName);
+								
+								if(clientRequestAndResponseInformation.fileName.equals("abc")){
+									clientRequestAndResponseInformation.hitQuery=true;
+									clientRequestAndResponseInformation.searchQuery=false;
+									clientRequestAndResponseInformation.destPort=port;
+									Socket client = new Socket("localhost",clientRequestAndResponseInformation.sourcePort);
+									
+									ObjectOutputStream out= new ObjectOutputStream(threadClient.getOutputStream());
+									out.writeObject(clientRequestAndResponseInformation);
+									
+									out.close();	
+								}
+								
 							}else{
-								DataOutputStream out= new DataOutputStream(threadClient.getOutputStream());
-								out.writeUTF("Hey I saw that");
+								if(clientRequestAndResponseInformation.hitQuery){
+									ClientRequestAndResponseInformation response= (ClientRequestAndResponseInformation) in.readObject();
+									System.out.println(response.destPort);
+								}						
 								
 							}
 							
@@ -114,11 +136,18 @@ public class Clients {
 			OutputStream outToServer = client.getOutputStream();
 		    ObjectOutputStream out = new ObjectOutputStream(outToServer);
 			out.writeObject(clientRequestAndResponseInformation);
-			while(true){
-				DataInputStream in = new DataInputStream(client.getInputStream());
-				System.out.println(in.readUTF());
-				
+			
+			ObjectInputStream in = new ObjectInputStream(client.getInputStream());
+			ClientRequestAndResponseInformation response= (ClientRequestAndResponseInformation) in.readObject();
+			
+			if(response.sourcePort==port){
+				System.out.println("Seen this query");
+			}else{
+				System.out.println(response.destPort);
 			}
+			
+				
+		
 			
 			
 		}catch(Exception e){
@@ -204,8 +233,7 @@ public class Clients {
 			}
 		}.start();
 		
-		String query;
-		int ttl=3;
+		
 		//Get the user query i.e the file name
 		while(true){
 			Scanner reader = new Scanner(System.in);  // Reading from System.in
@@ -221,11 +249,16 @@ public class Clients {
 				ClientRequestAndResponseInformation clientRequestAndResponseInformation = new ClientRequestAndResponseInformation();
 			
 				for(int otherClientPort:otherClients){
-					//set the object to be send 
-					clientRequestAndResponseInformation.setQuery(port,ttl,query,uuid);
-					//store the object in the map
-					map.put(uuid,clientRequestAndResponseInformation);
-					connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+					new Thread(){
+						public void run(){
+							//set the object to be send 
+							clientRequestAndResponseInformation.setQuery(port,ttl,query,uuid);
+							//store the object in the map
+							map.put(uuid,clientRequestAndResponseInformation);
+							connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+						}
+					}.start();
+					
 				
 				}
 			}
