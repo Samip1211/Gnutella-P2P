@@ -52,68 +52,67 @@ public class Clients {
 							ObjectInputStream in = new ObjectInputStream(threadClient.getInputStream());
 							//Get the file to send to the other client
 							ClientRequestAndResponseInformation clientRequestAndResponseInformation= (ClientRequestAndResponseInformation) in.readObject();
+							//Print to console that serving one object
+							System.out.println("Got Object");
+							
 							
 							//Seeing this request for first time
-							if(map.get(clientRequestAndResponseInformation.messageId)!=null){
-								
+							if(map.get(clientRequestAndResponseInformation.messageId)==null){
+								//See if this query is valid
 								if(clientRequestAndResponseInformation.searchQuery && clientRequestAndResponseInformation.tTl>0){
+									//descrease the TTL
 									clientRequestAndResponseInformation.tTl--;
-								
+									//Store the query for further use
 									map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
-									/*
+									//Send this query to all the other clients connected to the current client
 									new Thread(){
 										public void run(){
 											for(int otherClientPort:otherClients){
-												connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+												//Don't send the query to the client who has started this query
+												if(clientRequestAndResponseInformation.sourcePort!=otherClientPort){
+													connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+												}else{
+													//Print
+													System.out.println("Not forwarding to"+otherClientPort+"as it is the origin");
+												}
+												
 											}
 										}
-									}.start();*/
+									}.start();
 									
 								}
+								//LogOut the fileName
 								System.out.println(clientRequestAndResponseInformation.fileName);
-								
+								//See if the file is present.
 								if(clientRequestAndResponseInformation.fileName.equals("abc")){
+									//Set the query so as to reply.
 									clientRequestAndResponseInformation.hitQuery=true;
 									clientRequestAndResponseInformation.searchQuery=false;
 									clientRequestAndResponseInformation.destPort=port;
-									Socket client = new Socket("localhost",clientRequestAndResponseInformation.sourcePort);
+									//Connect to that client
+									try{
+										Socket client = new Socket("localhost",clientRequestAndResponseInformation.sourcePort);
 									
-									ObjectOutputStream out= new ObjectOutputStream(threadClient.getOutputStream());
-									out.writeObject(clientRequestAndResponseInformation);
+										ObjectOutputStream out= new ObjectOutputStream(threadClient.getOutputStream());
+										out.writeObject(clientRequestAndResponseInformation);
 									
-									out.close();	
+										out.close();	
+									}catch(Exception e){
+										
+										System.out.println("Client has got the reply from different client");
+									}
+									
 								}
 								
+								long end = System.currentTimeMillis( );
+								long diff = end - start;
+								//Get the time difference from the initialization of the thread till now
+								System.out.println("Difference is : " + diff + " "+ start + "  "+ end);
 							}else{
-								if(clientRequestAndResponseInformation.hitQuery){
-									ClientRequestAndResponseInformation response= (ClientRequestAndResponseInformation) in.readObject();
-									System.out.println(response.destPort);
-								}						
+									System.out.println("Already seen this query and took neccessary actions. No need to do now");					
 								
 							}
 							
-							//storeTheObject();
-							//sendTheObjectToOtherClients();
-							
-							
-							/*
-							System.out.println("File NAme" + fileName);
-							//Initalize file object and write in the outputstream
-							File myFile = new File(fileName);
-							System.out.println(myFile.length());
-							byte[] mybytearray = new byte[(int) myFile.length()];
-							BufferedInputStream bis = new BufferedInputStream(new FileInputStream(myFile));
-							bis.read(mybytearray, 0, mybytearray.length);
-							
-							OutputStream os = threadClient.getOutputStream();
-							os.write(mybytearray, 0, mybytearray.length);
-							os.flush();
-							in.close();*/
-							//Get the time difference from the initialization of the thread till now
-							long end = System.currentTimeMillis( );
-							long diff = end - start;
-							System.out.println("Difference is : " + diff + " "+ start + "  "+ end);
-				
 						}catch(Exception e){
 							System.out.println(e);
 						}
@@ -122,8 +121,6 @@ public class Clients {
 				}.start();
 			}		
 			
-		
-		
 		}catch(Exception e){
 			System.out.println(e);
 		}
@@ -140,8 +137,9 @@ public class Clients {
 			ObjectInputStream in = new ObjectInputStream(client.getInputStream());
 			ClientRequestAndResponseInformation response= (ClientRequestAndResponseInformation) in.readObject();
 			
-			if(response.sourcePort==port){
-				System.out.println("Seen this query");
+			if(response.hitQuery){
+				System.out.println("Got Reply from "+ response.destPort);
+				in.close();
 			}else{
 				System.out.println(response.destPort);
 			}
