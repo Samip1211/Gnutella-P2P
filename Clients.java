@@ -44,7 +44,7 @@ public class Clients {
 				Socket threadClient= server.accept();
 					//On accepting client request spawn a new Thread
 				new Thread(){
-					public synchronized void run(){
+					public  void run(){
 						try{
 							//Get the current time
 							long start = System.currentTimeMillis();
@@ -66,11 +66,12 @@ public class Clients {
 									map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
 									//Send this query to all the other clients connected to the current client
 									new Thread(){
-										public void run(){
+										public synchronized void run(){
 											for(int otherClientPort:otherClients){
 												//Don't send the query to the client who has started this query
 												if(clientRequestAndResponseInformation.sourcePort!=otherClientPort){
-													connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+													System.out.println("Sending to :"+otherClientPort);
+													forwardTheRequestToOtherClients(otherClientPort,clientRequestAndResponseInformation);
 												}else{
 													//Print
 													System.out.println("Not forwarding to"+otherClientPort+"as it is the origin");
@@ -81,35 +82,25 @@ public class Clients {
 									}.start();
 									
 								}
-								//LogOut the fileName
-								System.out.println(clientRequestAndResponseInformation.fileName);
-								//See if the file is present.
-								if(clientRequestAndResponseInformation.fileName.equals("abc")){
-									//Set the query so as to reply.
-									clientRequestAndResponseInformation.hitQuery=true;
-									clientRequestAndResponseInformation.searchQuery=false;
-									clientRequestAndResponseInformation.destPort=port;
-									//Connect to that client
-									try{
-										Socket client = new Socket("localhost",clientRequestAndResponseInformation.sourcePort);
-									
-										ObjectOutputStream out= new ObjectOutputStream(threadClient.getOutputStream());
-										out.writeObject(clientRequestAndResponseInformation);
-									
-										out.close();	
-									}catch(Exception e){
-										
-										System.out.println("Client has got the reply from different client");
-									}
-									
-								}
+								
+								checkTheRequestAndSendTheFileIfExist(clientRequestAndResponseInformation);
+								
 								
 								long end = System.currentTimeMillis( );
 								long diff = end - start;
 								//Get the time difference from the initialization of the thread till now
 								System.out.println("Difference is : " + diff + " "+ start + "  "+ end);
 							}else{
-									System.out.println("Already seen this query and took neccessary actions. No need to do now");					
+								//Since it is seen request check if it is hit Query.
+								if(clientRequestAndResponseInformation.hitQuery){
+									try{
+										System.out.println("Got the reply from "+clientRequestAndResponseInformation.destPort);
+									}catch(Exception e){
+										System.out.println(e);
+										System.out.println("There's something wrong with the connection");
+									}
+								}
+									//System.out.println("Already seen this query and took neccessary actions. No need to do now");					
 								
 							}
 							
@@ -124,6 +115,51 @@ public class Clients {
 		}catch(Exception e){
 			System.out.println(e);
 		}
+	}
+	public static synchronized void checkTheRequestAndSendTheFileIfExist(ClientRequestAndResponseInformation clientRequestAndResponseInformation){
+		
+		//LogOut the fileName
+		System.out.println(clientRequestAndResponseInformation.fileName);
+		//See if the file is present.
+		if(clientRequestAndResponseInformation.fileName.equals("abc")){
+			//Set the query so as to reply.
+			clientRequestAndResponseInformation.hitQuery=true;
+			clientRequestAndResponseInformation.searchQuery=false;
+			clientRequestAndResponseInformation.destPort=port;
+			//Connect to that client
+			System.out.println("Trying to connect to"+clientRequestAndResponseInformation.sourcePort );
+			try{
+				
+				Socket client = new Socket("localhost",clientRequestAndResponseInformation.sourcePort);
+			
+				ObjectOutputStream out= new ObjectOutputStream(client.getOutputStream());
+				out.writeObject(clientRequestAndResponseInformation);
+			
+				out.close();	
+			}catch(Exception e){
+				System.out.println(e);
+				System.out.println("Client has got the reply from different client");
+			}
+			
+		}else{
+			//NOTHING TO DO
+		}
+		
+	}
+	public static synchronized void forwardTheRequestToOtherClients(int serverPort, ClientRequestAndResponseInformation clientRequestAndResponseInformation){
+		
+		try{
+			Socket client = new Socket("localhost",serverPort);
+		    
+			OutputStream outToServer = client.getOutputStream();
+		    ObjectOutputStream out = new ObjectOutputStream(outToServer);
+			out.writeObject(clientRequestAndResponseInformation);
+			out.flush();
+			
+		}catch(Exception e){
+			System.out.println(e);
+		}
+		
 	}
 	public static void connectToClientforFileInformation(int serverPort, ClientRequestAndResponseInformation clientRequestAndResponseInformation){
 		
@@ -143,11 +179,6 @@ public class Clients {
 			}else{
 				System.out.println(response.destPort);
 			}
-			
-				
-		
-			
-			
 		}catch(Exception e){
 			System.out.println(e);
 		}
