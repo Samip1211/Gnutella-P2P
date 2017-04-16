@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<project name="Clients" default="all" basedir=".">
+
+<target name="all" depends="compile,run"/>
+
+<target name="compile">
+       <javac srcdir="." includeantruntime="false" includes="Clients.java" destdir=".">
+       </javac>
+</target>
+<target name="run" depends="compile">
+<java classname="Clients" fork="true">
+   <arg value="${value1}"/>
+   <arg value="${value2}"/>
+</java>
+</target>
+<target name="clean">
+    
+    <delete>
+      <fileset dir=".">
+        <include name="*.class"/>
+        
+      </fileset>
+    </delete>
+  </target>
+
+</project>

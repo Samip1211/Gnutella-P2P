@@ -2,7 +2,7 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 
-//Object describing the client which is passed aroundvichar
+//Object describing the client which is passed around
 
 class ClientRequestAndResponseInformation implements Serializable{
 	boolean searchQuery;
@@ -13,6 +13,7 @@ class ClientRequestAndResponseInformation implements Serializable{
 	String fileName;
 	int sourcePort;
 	int destPort;
+	
 	public void setQuery(int serverId, int tTl,String fileName,String messageId){
 		this.searchQuery=true;
 		this.hitQuery= false;
@@ -22,9 +23,7 @@ class ClientRequestAndResponseInformation implements Serializable{
 		this.fileName=fileName;
 	}
 	
-	public void setForOtherClient(){
-		
-	}
+	
 	
 }
 
@@ -32,13 +31,13 @@ class ClientRequestAndResponseInformation implements Serializable{
 
 
 public class Clients {
-	static int port;
-	static String fileToGet;
-	static List<Integer> otherClients;
-	static Map<String,ClientRequestAndResponseInformation> map;
-	static String query;
-	static int ttl=3;
-	static List<String> filesPresent;
+	static int port; 												//Client Port
+	static String fileToGet;										//The requested file	
+	static List<Integer> otherClients;								//List of other clients presenr
+	static Map<String,ClientRequestAndResponseInformation> map;		// Internal Data structure to check if the query has been seen
+	static int ttl=3;												//Time to live
+	static List<String> filesPresent;								//List of files present in the current directory
+	
 	//Call this method when u want your client to act as server
 	public static void makeServer(int port) {
 		
@@ -55,8 +54,10 @@ public class Clients {
 							long start = System.currentTimeMillis();
 							//Read the object stream
 							ObjectInputStream in = new ObjectInputStream(threadClient.getInputStream());
+							
 							//Get the file to send to the other client
 							ClientRequestAndResponseInformation clientRequestAndResponseInformation= (ClientRequestAndResponseInformation) in.readObject();
+							
 							//Print to console that serving one object
 							System.out.println("Got Object");
 							
@@ -69,24 +70,23 @@ public class Clients {
 									clientRequestAndResponseInformation.tTl--;
 									//Store the query for further use
 									map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
+									
 									//Send this query to all the other clients connected to the current client
-									
-									
-									
 									new Thread(){
 										public synchronized void run(){
 											
 											for(int otherClientPort:otherClients){
-												//Don't send the query to the client who has started this query
-												ClientRequestAndResponseInformation forOtherClient= new ClientRequestAndResponseInformation();
 												
+												// Initialize a new object to pass
+												ClientRequestAndResponseInformation forOtherClient= new ClientRequestAndResponseInformation();
+												//Don't send the query to the client who has started this query
 												if(clientRequestAndResponseInformation.sourcePort!=otherClientPort){
-													
+													//Set the query to send
 													forOtherClient.setQuery(clientRequestAndResponseInformation.sourcePort,clientRequestAndResponseInformation.tTl,
 																		clientRequestAndResponseInformation.fileName,clientRequestAndResponseInformation.messageId);
 													
 													System.out.println("Sending to :"+otherClientPort);
-													
+													//Send the query
 													forwardTheRequestToOtherClients(otherClientPort,forOtherClient);
 												}else{
 													//Print
@@ -97,6 +97,7 @@ public class Clients {
 										}
 									}.start();
 									
+									//After sending check if the file is present and If present send the present file respose
 									checkTheRequestAndSendTheFileIfExist(clientRequestAndResponseInformation);
 								
 								
@@ -110,14 +111,17 @@ public class Clients {
 								//Since it is seen request check if it is hit Query.
 								if(clientRequestAndResponseInformation.hitQuery){
 									try{
+										//Print out
 										System.out.println("Got the reply from "+clientRequestAndResponseInformation.destPort);
 										
+										//Seens the above client has the file connct to the client to request file
 										connectToClientToDownloadFile(clientRequestAndResponseInformation.destPort,clientRequestAndResponseInformation.fileName,clientRequestAndResponseInformation.messageId);
 									}catch(Exception e){
 										System.out.println(e);
 										System.out.println("There's something wrong with the connection");
 									}
 								}
+								//Seen the query and if the query is for getting the file ("obtain(file)" function)
 								if(clientRequestAndResponseInformation.getFile){
 									
 									
@@ -162,6 +166,7 @@ public class Clients {
 			System.out.println(e);
 		}
 	}
+	//This function checks if the requesting file is present in the current directory
 	public static synchronized void checkTheRequestAndSendTheFileIfExist(ClientRequestAndResponseInformation clientRequestAndResponseInformation){
 		
 		//LogOut the fileName
@@ -175,7 +180,7 @@ public class Clients {
 			//Connect to that client
 			System.out.println("Trying to connect to"+clientRequestAndResponseInformation.sourcePort );
 			try{
-				
+				//Connect to the client and send the object 
 				Socket client = new Socket("localhost",clientRequestAndResponseInformation.sourcePort);
 			
 				ObjectOutputStream out= new ObjectOutputStream(client.getOutputStream());
@@ -192,6 +197,8 @@ public class Clients {
 		}
 		
 	}
+	
+	//This function is called by intermediateclients to forward the given query to clients that are present in its vicinity
 	public static synchronized void forwardTheRequestToOtherClients(int serverPort, ClientRequestAndResponseInformation clientRequestAndResponseInformation){
 		
 		try{
@@ -207,6 +214,8 @@ public class Clients {
 		}
 		
 	}
+	
+	//This function is called by client who wants to get the given file from other clients
 	public static void connectToClientforFileInformation(int serverPort, ClientRequestAndResponseInformation clientRequestAndResponseInformation){
 		
 		try{
@@ -286,6 +295,8 @@ public class Clients {
 			System.out.println(e);
 		}
 	}
+	
+	//This function is called on initialization of client so as to get the files present in the current directory
 	 static void saveFilesinCurrDir(){
 		filesPresent = new ArrayList<String>();
 		
@@ -303,6 +314,8 @@ public class Clients {
 			}
 		}
 	}
+	
+	//Main method. It is called when the program is runned
 	public static void main(String[] args){
 		//List of other clients
 		otherClients = new ArrayList<Integer>();
@@ -355,7 +368,8 @@ public class Clients {
 				String uuid = UUID.randomUUID().toString();
 				//System.out.println(uuid); Print the randomly generted string
 				ClientRequestAndResponseInformation clientRequestAndResponseInformation = new ClientRequestAndResponseInformation();
-			
+				
+				//Iterate through the contents of the config file and send the query to the clients present in config file.
 				for(int otherClientPort:otherClients){
 					new Thread(){
 						public void run(){
@@ -363,6 +377,8 @@ public class Clients {
 							clientRequestAndResponseInformation.setQuery(port,ttl,query,uuid);
 							//store the object in the map
 							map.put(uuid,clientRequestAndResponseInformation);
+							
+							//Send the query to other clients
 							connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
 						}
 					}.start();
