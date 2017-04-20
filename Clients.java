@@ -8,15 +8,23 @@ class ClientRequestAndResponseInformation implements Serializable{
 	boolean searchQuery;
 	boolean getFile;
 	boolean hitQuery;
+	boolean invalidate;
 	String messageId;
 	int tTl;
 	String fileName;
 	int sourcePort;
 	int destPort;
 	
-	public void setQuery(int serverId, int tTl,String fileName,String messageId){
-		this.searchQuery=true;
-		this.hitQuery= false;
+	public void setQuery(int serverId, int tTl,String fileName,String messageId,int flag){
+		if(flag==1){
+			this.searchQuery=true;
+			this.hitQuery= false;
+		}else{
+			this.invalidate=true;
+			this.searchQuery=false;
+			this.hitQuery=false;
+		}
+		
 		this.messageId= messageId;
 		this.tTl= tTl;
 		this.sourcePort= serverId;
@@ -63,51 +71,104 @@ public class Clients {
 							
 							//Seeing this request for first time
 							if(map.get(clientRequestAndResponseInformation.messageId)==null){
-								System.out.println(clientRequestAndResponseInformation.searchQuery);
-								//See if this query is valid
-								if(clientRequestAndResponseInformation.tTl>0){
-									//descrease the TTL
-									clientRequestAndResponseInformation.tTl--;
-									//Store the query for further use
-									map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
+								//If it is for the first time see if the query is for file searching or invalidate
+								System.out.println("Status of the request"+clientRequestAndResponseInformation.searchQuery + " "+clientRequestAndResponseInformation.invalidate);
+								if(clientRequestAndResponseInformation.searchQuery){
 									
-									//Send this query to all the other clients connected to the current client
-									new Thread(){
-										public synchronized void run(){
+									//See if this query is valid
+									if(clientRequestAndResponseInformation.tTl>0){
+										//descrease the TTL
+										clientRequestAndResponseInformation.tTl--;
+										//Store the query for further use
+										map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
+									
+										//Send this query to all the other clients connected to the current client
+										new Thread(){
+											public synchronized void run(){
 											
-											for(int otherClientPort:otherClients){
+												for(int otherClientPort:otherClients){
 												
-												// Initialize a new object to pass
-												ClientRequestAndResponseInformation forOtherClient= new ClientRequestAndResponseInformation();
-												//Don't send the query to the client who has started this query
-												if(clientRequestAndResponseInformation.sourcePort!=otherClientPort){
-													//Set the query to send
-													forOtherClient.setQuery(clientRequestAndResponseInformation.sourcePort,clientRequestAndResponseInformation.tTl,
-																		clientRequestAndResponseInformation.fileName,clientRequestAndResponseInformation.messageId);
+													// Initialize a new object to pass
+													ClientRequestAndResponseInformation forOtherClient= new ClientRequestAndResponseInformation();
+													//Don't send the query to the client who has started this query
+													if(clientRequestAndResponseInformation.sourcePort!=otherClientPort){
+														//Set the query to send
+														forOtherClient.setQuery(clientRequestAndResponseInformation.sourcePort,clientRequestAndResponseInformation.tTl,
+																			clientRequestAndResponseInformation.fileName,clientRequestAndResponseInformation.messageId,1);
 													
-													System.out.println("Sending to :"+otherClientPort);
-													//Send the query
-													forwardTheRequestToOtherClients(otherClientPort,forOtherClient);
-												}else{
-													//Print
-													System.out.println("Not forwarding to"+otherClientPort+"as it is the origin");
-												}
+														System.out.println("Sending to :"+otherClientPort);
+														//Send the query
+														forwardTheRequestToOtherClients(otherClientPort,forOtherClient);
+													}else{
+														//Print
+														System.out.println("Not forwarding to"+otherClientPort+"as it is the origin");
+													}
 												
+												}
 											}
-										}
-									}.start();
+										}.start();
 									
-									//After sending check if the file is present and If present send the present file respose
-									checkTheRequestAndSendTheFileIfExist(clientRequestAndResponseInformation);
+										//After sending check if the file is present and If present send the present file respose
+										checkTheRequestAndSendTheFileIfExist(clientRequestAndResponseInformation);
 								
+										/*
+										long end = System.currentTimeMillis( );
+										long diff = end - start;
+										//Get the time difference from the initialization of the thread till now
+										System.out.println("Difference to complete request : " + diff + " "+ start + "  "+ end);*/
+									}
+									
+								}else{
+									if(clientRequestAndResponseInformation.invalidate){
+										System.out.println(clientRequestAndResponseInformation.searchQuery);
+										//See if this query is valid
+										if(clientRequestAndResponseInformation.tTl>0){
+											//descrease the TTL
+											clientRequestAndResponseInformation.tTl--;
+											//Store the query for further use
+											map.put(clientRequestAndResponseInformation.messageId,clientRequestAndResponseInformation);
+									
+											//Send this query to all the other clients connected to the current client
+											new Thread(){
+												public synchronized void run(){
+											
+													for(int otherClientPort:otherClients){
+												
+														// Initialize a new object to pass
+														ClientRequestAndResponseInformation forOtherClient= new ClientRequestAndResponseInformation();
+														//Don't send the query to the client who has started this query
+														if(clientRequestAndResponseInformation.sourcePort!=otherClientPort){
+															//Set the query to send
+															forOtherClient.setQuery(clientRequestAndResponseInformation.sourcePort,clientRequestAndResponseInformation.tTl,
+																				clientRequestAndResponseInformation.fileName,clientRequestAndResponseInformation.messageId,2);
+													
+															System.out.println("Sending to :"+otherClientPort);
+															//Send the query
+															forwardTheRequestToOtherClients(otherClientPort,forOtherClient);
+														}else{
+															//Print
+															System.out.println("Not forwarding to"+otherClientPort+"as it is the origin");
+														}
+												
+													}
+												}
+											}.start();
+									
+											//After sending check if the file is present and If present send the present file respose
+											checkIfFilePresentInvalidateAndGetNewVersion(clientRequestAndResponseInformation.fileName,clientRequestAndResponseInformation.sourcePort,
+																							clientRequestAndResponseInformation.messageId);
 								
-									long end = System.currentTimeMillis( );
-									long diff = end - start;
-									//Get the time difference from the initialization of the thread till now
-									System.out.println("Difference to complete request : " + diff + " "+ start + "  "+ end);
-										
+											/*
+											long end = System.currentTimeMillis( );
+											long diff = end - start;
+											//Get the time difference from the initialization of the thread till now
+											System.out.println("Difference to complete request : " + diff + " "+ start + "  "+ end);*/
+										}
+									}
 								}
+									
 							}else{
+								//saw this request now check if it a hitquery or a file request query
 								//Since it is seen request check if it is hit Query.
 								if(clientRequestAndResponseInformation.hitQuery){
 									try{
@@ -149,9 +210,8 @@ public class Clients {
 									System.out.println("Difference to send file : " + diff);
 																
 								}
-									//System.out.println("Already seen this query and took neccessary actions. No need to do now");					
-								
 							}
+						
 								
 								
 						}catch(Exception e){
@@ -165,6 +225,26 @@ public class Clients {
 		}catch(Exception e){
 			System.out.println(e);
 		}
+	}
+	//This function in activated when there is invalidate message it checks if the file 
+	//is present in the download directory, if present it invalidates the file and
+	//initiates the download of the new version of file.
+	public static synchronized void checkIfFilePresentInvalidateAndGetNewVersion(String fileName,int port,String messageId){
+		try{
+			File file = new File(System.getProperty("user.dir")+"/downloads/"+fileName);
+		
+			if(file.delete()){
+				System.out.println("File found!! getting the new version");
+			}else{
+			
+			}
+			connectToClientToDownloadFile(port,fileName,messageId);
+			
+		}catch(Exception e){
+			
+		}
+		
+		
 	}
 	//This function checks if the requesting file is present in the current directory
 	public static synchronized void checkTheRequestAndSendTheFileIfExist(ClientRequestAndResponseInformation clientRequestAndResponseInformation){
@@ -270,7 +350,7 @@ public class Clients {
 			
 				byte[] mybytearray = new byte[6022386];
 				InputStream is = client.getInputStream();
-				FileOutputStream fos = new FileOutputStream(fileName);
+				FileOutputStream fos = new FileOutputStream(System.getProperty("user.dir")+"/downloads/"+fileName);
 			    int bytesRead;
 			    int current = 0;
 				BufferedOutputStream bos = null;
@@ -288,7 +368,7 @@ public class Clients {
 				long end = System.currentTimeMillis( );
 				long diff = end - start;
 				System.out.println("Difference to get file : " + diff);
-				filesPresent.add(fileName);
+				//filesPresent.add(fileName);
 			}
 			
 		}catch(Exception e){
@@ -312,6 +392,29 @@ public class Clients {
 			} else if (listOfFiles[i].isDirectory()) {
 				        //System.out.println("Directory " + listOfFiles[i].getName());
 			}
+		}
+	}
+	
+	static void sendThePacketWithQueryOrInvalidate(String query,int flag){
+		//Search for the file in the query
+		String uuid = UUID.randomUUID().toString();
+		//System.out.println(uuid); Print the randomly generted string
+		ClientRequestAndResponseInformation clientRequestAndResponseInformation = new ClientRequestAndResponseInformation();
+	
+		//Iterate through the contents of the config file and send the query to the clients present in config file.
+		for(int otherClientPort:otherClients){
+			new Thread(){
+				public void run(){
+					//set the object to be send 
+					clientRequestAndResponseInformation.setQuery(port,ttl,query,uuid,flag);
+					//store the object in the map
+					map.put(uuid,clientRequestAndResponseInformation);
+				
+					//Send the query to other clients
+					connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
+				}
+			}.start();
+		
 		}
 	}
 	
@@ -357,39 +460,40 @@ public class Clients {
 		
 		//Get the user query i.e the file name
 		while(true){
+			System.out.println("Please choose what would you like to do: ");
+			System.out.println("1. To get file");
+			System.out.println("2. Enter the changed file name\n3. To exit");
+			
 			Scanner reader = new Scanner(System.in);  // Reading from System.in
-			System.out.println("Enter the query: ");
-			query = reader.nextLine();
-			//signal to exit
-			if(query.equals("exit")){
-				break;
-			}else{
-				//Search for the file in the query
-				String uuid = UUID.randomUUID().toString();
-				//System.out.println(uuid); Print the randomly generted string
-				ClientRequestAndResponseInformation clientRequestAndResponseInformation = new ClientRequestAndResponseInformation();
+			
+			switch(reader.nextInt()){
+				case 1:
+					System.out.println("Enter the query");
 				
-				//Iterate through the contents of the config file and send the query to the clients present in config file.
-				for(int otherClientPort:otherClients){
-					new Thread(){
-						public void run(){
-							//set the object to be send 
-							clientRequestAndResponseInformation.setQuery(port,ttl,query,uuid);
-							//store the object in the map
-							map.put(uuid,clientRequestAndResponseInformation);
-							
-							//Send the query to other clients
-							connectToClientforFileInformation(otherClientPort,clientRequestAndResponseInformation);
-						}
-					}.start();
+					Scanner readQuery = new Scanner(System.in);  // Reading from System.in
 					
+					String query= readQuery.nextLine();
+					
+					sendThePacketWithQueryOrInvalidate(query,1);
+					
+					break;
 				
-				}
+				case 2:
+					System.out.println("Enter the file that has changed");
+			
+					Scanner readInvalidate = new Scanner(System.in);  // Reading from System.in
+					
+					String invalidate= readInvalidate.nextLine();
+					
+					sendThePacketWithQueryOrInvalidate(invalidate,2);
+				
+					break;
+				case 3:
+					System.exit(0);
+					break;
+				default:
+					System.exit(0);
 			}
-			
-			
 		}
-		System.exit(0);
-		
 	}
 }
