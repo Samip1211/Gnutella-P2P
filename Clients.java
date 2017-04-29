@@ -5,17 +5,19 @@ import java.io.*;
 //Object describing the client which is passed around
 
 class ClientRequestAndResponseInformation implements Serializable{
-	boolean searchQuery;
-	boolean getFile;
-	boolean hitQuery;
-	boolean invalidate;
-	String messageId;
-	int tTl;
-	String fileName;
-	int sourcePort;
-	int destPort;
+	
+	boolean searchQuery; //This is the flag to suggest that the object recieved is search query
+	boolean getFile;  //This is the flag to suggest that the object recieved is request to get file .
+	boolean hitQuery;  //This is the flag to suggest that the object recieved is hit query
+	boolean invalidate; // //This is the flag to suggest that the object recieved is invalidate query
+	String messageId; //The unique-Id generated when new request is made.
+	int tTl; //time to live
+	String fileName; // The name of the file requested for searching or obtaining
+	int sourcePort; //The port from which the query originated
+	int destPort; //The port to which query has to be send.
 	
 	public void setQuery(int serverId, int tTl,String fileName,String messageId,int flag){
+		//Flag is used to decide whether the query is for searching or invalidate messages
 		if(flag==1){
 			this.searchQuery=true;
 			this.hitQuery= false;
@@ -59,6 +61,7 @@ public class Clients {
 				new Thread(){
 					public  void run(){
 						try{
+							
 							long start = System.currentTimeMillis();
 							//Read the object stream
 							ObjectInputStream in = new ObjectInputStream(threadClient.getInputStream());
